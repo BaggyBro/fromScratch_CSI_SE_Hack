@@ -522,3 +522,23 @@ body {
     font-size: 1.1rem;
   }
 }
+
+.story-expanded {
+  margin-top: 15px;
+  padding: 10px;
+  background-color: #1e1e1e;
+  border: 1px solid #333;
+  border-radius: 8px;
+}
+
+.json-response-box {
+  background-color: #0f0f0f;
+  padding: 10px;
+  margin-top: 10px;
+  font-family: monospace;
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+  color: #ccc;
+  border-radius: 6px;
+  border: 1px solid #444;
+}
