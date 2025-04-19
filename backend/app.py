@@ -3,18 +3,31 @@ from flask import Flask, request, jsonify
 from dotenv import load_dotenv
 from openai import OpenAI
 from controllers.parser_controller import extract_text_from_pdf
-from db import summaries_collection, client  # Importing the collection and client
+from db import summaries_collection, client  # MongoDB
+from controllers.fetch_script_controller import fetch_script_by_title
 
 # Load environment variables
 load_dotenv()
 
+# OpenRouter AI client setup
 api_key = os.getenv("OPENROUTER_API_KEY")
 client_ai = OpenAI(
     api_key=api_key,
     base_url="https://openrouter.ai/api/v1",
 )
 
-# System prompt stays here
+# 🌍 Canon data loader from MongoDB
+def get_canon_context(limit=10):
+    try:
+        canon_docs = summaries_collection.find().limit(limit)
+        combined = ""
+        for doc in canon_docs:
+            combined += f"Title: {doc.get('title', '')}\nSummary: {doc.get('summary', '')}\n\n"
+        return combined.strip()
+    except Exception as e:
+        return f"Error fetching canon context: {e}"
+
+# 🤖 LLM System Prompt
 system_prompt = """
 You are a highly knowledgeable Marvel Cinematic Universe expert assistant working with a team of MCU writers.
 Your job is to evaluate creative inputs, spot canon contradictions, and generate a contradiction score (0–100). 
@@ -49,14 +62,9 @@ Rules:
 }
 
 Only include "function_call" if needed.
-You can call functions such as:
-- flag_character_behavior(character: str, traits: list)
-- timeline_check(event: str)
-- suggest_explanation(contradiction: str)
-
-Respond in JSON only — no extra commentary.
 """
 
+# 🧠 Main function to call LLM
 def call_llm(prompt, model="meta-llama/llama-4-maverick:free"):
     try:
         response = client_ai.chat.completions.create(
@@ -74,7 +82,7 @@ def call_llm(prompt, model="meta-llama/llama-4-maverick:free"):
 
 app = Flask(__name__)
 
-# Route to parse the PDF and run the AI model
+# 📄 Route: Upload a story, compare with canon, get contradiction report
 @app.route('/parse', methods=['POST'])
 def parse_pdf_and_run_ai():
     if 'pdf' not in request.files:
@@ -86,10 +94,25 @@ def parse_pdf_and_run_ai():
     if extracted_text.startswith("Error"):
         return jsonify({'error': extracted_text}), 500
 
-    result = call_llm(extracted_text)
+    # 👇 Combine canon + user input as prompt
+    canon_context = get_canon_context(limit=10)
+    prompt = f"""
+MCU Canon:
+{canon_context}
+
+--- USER INPUT BELOW ---
+
+New Story Submission:
+{extracted_text}
+
+Evaluate the user input against MCU canon.
+    """
+
+    result = call_llm(prompt)
     return jsonify({'llm_response': result})
 
-# Route to test MongoDB connection
+
+# ✅ Route to check MongoDB status
 @app.route('/db_status', methods=['GET'])
 def db_status():
     try:
@@ -98,25 +121,7 @@ def db_status():
     except Exception as e:
         return jsonify({"status": "disconnected", "error": str(e)}), 500
 
-# Test route to insert dummy data
-@app.route('/test_insert', methods=['GET'])
-def test_insert():
-    dummy_data = {
-        "title": "Test Movie",
-        "script": "This is a test script for the dummy movie.",
-        "timeline": "main",
-        "created_by": "admin"
-    }
-    result = summaries_collection.insert_one(dummy_data)
-    return jsonify({"message": "Data inserted", "inserted_id": str(result.inserted_id)})
-
-# Test route to retrieve data
-@app.route('/test_get', methods=['GET'])
-def test_get():
-    all_docs = summaries_collection.find()
-    results = [{**doc, "_id": str(doc["_id"])} for doc in all_docs]
-    return jsonify({"data": results})
-
+# 🔍 Route to get all MongoDB inputs
 @app.route('/get_all_inputs', methods=['GET'])
 def get_all_inputs():
     try:
