@@ -4,19 +4,24 @@ from collections import defaultdict, OrderedDict
 import re
 from neo4j import GraphDatabase
 import json
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
 
 # Load NLP model
 nlp = spacy.load("en_core_web_lg")
 
 # MongoDB setup
-client = MongoClient("mongodb+srv://tanishqchavan241:8lxUAOBVDRlTm44O@cluster0.9qe4xnl.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
+client = MongoClient(os.getenv("MONGO_URI"))
 db = client["MCU"]
 collection = db["main_summary"]
 
 # Neo4j setup
-NEO4J_URI = "neo4j+s://46659ffb.databases.neo4j.io"
-NEO4J_USER = "neo4j"
-NEO4J_PASSWORD = "izPmjaBwAu6rVc6eLz2IFt25kyzEmoBjkaPeZ8BNvIs"
+NEO4J_URI = os.getenv("NEO4J_URI")
+NEO4J_USER = os.getenv("NEO4J_USER")
+NEO4J_PASSWORD = os.getenv("NEO4J_PASS")
 driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
 
 # Clean Neo4j

@@ -6,6 +6,10 @@ from collections import defaultdict, OrderedDict
 from neo4j import GraphDatabase
 import spacy
 import re
+import os 
+from dotenv import load_dotenv
+
+load_dotenv()
 
 commit_bp = Blueprint("commit", __name__)
 
@@ -13,14 +17,14 @@ commit_bp = Blueprint("commit", __name__)
 nlp = spacy.load("en_core_web_lg")
 
 # MongoDB setup
-client = MongoClient("mongodb+srv://tanishqchavan241:8lxUAOBVDRlTm44O@cluster0.9qe4xnl.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
+client = MongoClient(os.getenv("MONGO_URI"))
 db = client["MCU"]
 script_collection = db["reports"]
 
 # Neo4j setup
 driver = GraphDatabase.driver(
-    "neo4j+s://46659ffb.databases.neo4j.io",
-    auth=("neo4j", "izPmjaBwAu6rVc6eLz2IFt25kyzEmoBjkaPeZ8BNvIs")
+    os.getenv("NEO4J_URI"),
+    auth=(os.getenv("NEO4J_USER"), os.getenv("NEO4J_PASS"))
 )
 
 # Known entities

@@ -1,14 +1,18 @@
 from flask import Blueprint, request, jsonify
 from graphene import ObjectType, String, Schema, Field, List
 from neo4j import GraphDatabase
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Blueprint for modularity
 graphql_bp = Blueprint("graphql_bp", __name__)
 
 # Neo4j setup
 driver = GraphDatabase.driver(
-    "neo4j+s://46659ffb.databases.neo4j.io",
-    auth=("neo4j", "izPmjaBwAu6rVc6eLz2IFt25kyzEmoBjkaPeZ8BNvIs")
+    os.getenv("NEO4J_URI"),
+    auth=(os.getenv("NEO4J_USER"), os.getenv("NEO4J_PASS"))
 )
 
 # GraphQL Object Types
