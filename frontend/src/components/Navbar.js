@@ -19,10 +19,10 @@ export const Navbar = () => {
             <div className="sidebar-header">
                 <div className="logo-container">
                     <div className="logo-circle">
-                        <span className="logo-text">SA</span>
+                        <span className="logo-text">CB</span>
                     </div>
                 </div>
-                <h2 className="sidebar-title" data-text="PlotHub">PlotHub</h2>
+                <h2 className="sidebar-title">CannonBot</h2>
             </div>
             <ul className="sidebar-list">
                 <li>
@@ -60,24 +60,13 @@ export const Navbar = () => {
                 </li>
                 <li>
                     <Link
-                        to="/settings"
-                        className={`sidebar-link ${location.pathname === '/settings' ? 'active' : ''}`}
-                        onMouseEnter={() => handleMouseEnter('/settings')}
+                        to="/knowledgegraph"
+                        className={`sidebar-link ${location.pathname === '/knowledgegraph' ? 'active' : ''}`}
+                        onMouseEnter={() => handleMouseEnter('/knowledgegraph')}
                         onMouseLeave={handleMouseLeave}
                     >
-                        <i className="nav-icon settings-icon"></i>
-                        <span>Settings</span>
-                    </Link>
-                </li>
-                <li className="logout-item">
-                    <Link
-                        to="/logout"
-                        className={`sidebar-link ${location.pathname === '/logout' ? 'active' : ''}`}
-                        onMouseEnter={() => handleMouseEnter('/logout')}
-                        onMouseLeave={handleMouseLeave}
-                    >
-                        <i className="nav-icon logout-icon"></i>
-                        <span>Logout</span>
+                        <i className="nav-icon graph-icon"></i>
+                        <span>Knowledge Graph</span>
                     </Link>
                 </li>
             </ul>

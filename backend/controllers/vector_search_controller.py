@@ -5,6 +5,7 @@ from tqdm import tqdm
 
 # Initialize the blueprint
 vector_search_bp = Blueprint('vector_search', __name__)
+commit_bp = Blueprint("commit_bp", __name__)
 
 # Initialize the Sentence Transformer model (same as before)
 model = SentenceTransformer("all-MiniLM-L6-v2")  # You can change the model to something else

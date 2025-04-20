@@ -1,15 +1,30 @@
+/* Import Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
 /* Global Styles */
 body {
   margin: 0;
   padding: 0;
-  font-family: 'Roboto', sans-serif;
-  min-height: 100vh;
   background-image: url('https://m.gettywallpapers.com/wp-content/uploads/2022/01/Avengers-4k-Wallpaper.jpg');
-  background-size: cover;
-  background-position: center center;
-  background-attachment: fixed;
+  font-family: 'Poppins', 'Roboto', sans-serif;
+  min-height: 100vh;
   color: #ffffff;
   overflow-x: hidden;
+  position: relative;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: url('https://wallpapercave.com/wp/wp2700223.jpg');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  z-index: -2;
 }
 
 /* Main Container */
@@ -17,8 +32,9 @@ body {
   display: flex;
   width: 100%;
   min-height: 100vh;
-  background-color: rgba(0, 0, 0, 0.5);
   position: relative;
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(5px);
 }
 
 /* Sidebar Styling */
@@ -26,13 +42,15 @@ body {
   position: fixed;
   width: 250px;
   height: 100%;
-  background: linear-gradient(to bottom, #d32f2f, #f44336);
-  /* Red gradient for sidebar */
+  background: linear-gradient(180deg, 
+      rgba(15, 23, 42, 0.95) 0%, 
+      rgba(30, 41, 59, 0.95) 100%
+  );
   color: white;
   padding: 30px 20px;
-  /* Add padding for spacing */
-  box-shadow: 4px 0px 6px rgba(0, 0, 0, 0.3);
+  box-shadow: 4px 0px 15px rgba(0, 0, 0, 0.3);
   z-index: 1000;
+  border-right: 1px solid rgba(59, 130, 246, 0.2);
 }
 
 /* Navbar Title Styling */
@@ -53,46 +71,75 @@ body {
 
 .sidebar .sidebar-link {
   display: flex;
-  color: #fff;
-  font-size: 1.2rem;
-  margin-bottom: 20px;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 1.1rem;
+  margin-bottom: 10px;
   text-decoration: none;
-  font-weight: bold;
-  padding: 20px;
+  font-weight: 500;
+  padding: 12px 20px;
   border-radius: 8px;
-  transition: background-color 0.3s ease, transform 0.3s ease;
+  transition: all 0.3s ease;
+  background: rgba(59, 130, 246, 0.05);
 }
 
 /* Hover Effect for Navbar Links */
 .sidebar .sidebar-link:hover {
-  background-color: #ff5722;
-  /* Change background on hover */
-  color: yellow;
-  transform: scale(1.05);
-  /* Slight zoom effect */
-  font-size: 1.3rem;
-  text-transform: uppercase;
-  letter-spacing: 1px;
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  transform: translateX(5px);
 }
 
 /* Active Navbar Link Styling */
 .sidebar .sidebar-link.active {
-  background-color: #ff3d00;
-  color: white;
+  background: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+  border-left: 3px solid #60a5fa;
 }
 
-/* Content Styling */
+/* Content Area */
 .content {
   margin-left: 250px;
   flex-grow: 1;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  justify-content: flex-start;
+  padding: 2rem;
+  background: rgba(15, 23, 42, 0.3);
   min-height: 100vh;
   box-sizing: border-box;
-  width: calc(100% - 250px);
+  position: relative;
+  z-index: 1;
+  backdrop-filter: blur(10px);
+}
+
+/* Add a subtle overlay */
+.content::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    135deg,
+    rgba(15, 23, 42, 0.7) 0%,
+    rgba(30, 41, 59, 0.7) 100%
+  );
+  z-index: -1;
+}
+
+/* Add ambient glow effects */
+.content::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 250px;
+  right: 0;
+  height: 100vh;
+  background: radial-gradient(
+      circle at 50% 0%, 
+      rgba(59, 130, 246, 0.15) 0%, 
+      transparent 70%
+  );
+  pointer-events: none;
+  z-index: -1;
 }
 
 /* Create Story Page Styling */
@@ -489,8 +536,11 @@ body {
 @media (max-width: 768px) {
   .content {
     margin-left: 70px;
-    padding: 0;
-    width: calc(100% - 70px);
+    padding: 1rem;
+  }
+  
+  .content::after {
+    left: 70px;
   }
 
   .create-story-container {

@@ -20,4 +20,5 @@ except Exception as e:
 db = client["MCU"]
 
 summaries_collection = db["main_summary"]
-users_collection = db["users"]  # optional, if user accounts are added later
+reports_collection = db["reports"]
+script_collection = db["scripts"]

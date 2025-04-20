@@ -1,13 +1,16 @@
 import os
+import json
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from dotenv import load_dotenv
 from openai import OpenAI
+from sentence_transformers import SentenceTransformer
+
 from controllers.parser_controller import extract_text_from_pdf
-from db import summaries_collection, client  # MongoDB
+from db import summaries_collection, script_collection, reports_collection  # MongoDB connection
 from controllers.graphql_controller import graphql_bp
 from controllers.vector_search_controller import vector_search_bp
-from sentence_transformers import SentenceTransformer
+from controllers.commit_controller import commit_bp
 
 # Load environment variables
 load_dotenv()
@@ -19,25 +22,24 @@ client_ai = OpenAI(
     base_url="https://openrouter.ai/api/v1",
 )
 
-# Initialize the Sentence Transformer model
-model = SentenceTransformer('all-MiniLM-L6-v2')  # Smaller, faster model
+# Initialize the embedding model
+model = SentenceTransformer('all-MiniLM-L6-v2')
 
-# 🚀 Embed the text using SentenceTransformer
+# Text embedding function
 def embed_text(text):
-    return model.encode(text).tolist()  # Convert the text to a vector and return as a list
+    return model.encode(text).tolist()
 
-# 🌍 Canon data loader from MongoDB
+# MongoDB vector search
 def get_canon_context_from_vector_search(user_story_vector, limit=5):
     try:
-        # Set up MongoDB aggregation pipeline for KNN search
         pipeline = [
             {
                 "$search": {
-                    "index": "default",  # Ensure this matches the name of your Atlas Search index
+                    "index": "default",
                     "knnBeta": {
                         "vector": user_story_vector,
-                        "path": "embedding",  # Path to the embedding field in your MongoDB collection
-                        "k": limit  # Number of nearest neighbors you want to retrieve
+                        "path": "embedding",
+                        "k": limit
                     }
                 }
             },
@@ -46,43 +48,100 @@ def get_canon_context_from_vector_search(user_story_vector, limit=5):
                     "title": 1,
                     "summary": 1,
                     "_id": 0,
-                    "score": {"$meta": "searchScore"}  # Include the search score
+                    "score": {"$meta": "searchScore"}
                 }
             }
         ]
 
-        # Execute the aggregation pipeline to get the most relevant canon data
-        canon_results = list(summaries_collection.aggregate(pipeline))
-        return canon_results
+        results = list(summaries_collection.aggregate(pipeline))
+        return results
     except Exception as e:
+        print(f"❌ MongoDB vector search error: {e}")
         return f"Error fetching canon context: {e}"
 
-# 🤖 LLM System Prompt (Updated for function call)
+
+
+# Get next Script_i title
+def get_next_script_title():
+    count = reports_collection.count_documents({})
+    return f"Script_{count + 1}"
+
+# System prompt for LLM
 system_prompt = """
-You are a highly knowledgeable Marvel Cinematic Universe expert assistant working with a team of MCU writers.
-Your job is to evaluate creative inputs, spot canon contradictions, and generate a contradiction score (0–100). 
-You will always respond in this structured JSON format:
+you are a highly knowledgeable marvel cinematic universe (mcu) expert assistant embedded in a professional screenwriting team. your job is to evaluate any creative input (story pitches, arcs, character decisions, events, timelines, or dialogue) and determine how much it contradicts established mcu canon using a contradiction score from 0 to 100.
+
+respond only in the following structured json format:
 
 {
-  "summary": "<Short one-liner summary>",
-  "contradiction_score": <0 to 100>,
+  "summary": "<one-sentence summary of the contradiction or confirmation of canon alignment>",
+  "contradiction_score": <integer from 0 to 100>,
   "justification": [
-    "<Point 1>",
-    "<Point 2>"
+    "<detailed explanation of contradiction or alignment - point 1>",
+    "<supporting point - timeline, characterization, canon logic, etc.>"
   ],
   "recommendations": [
-    "<Fix or suggestion if any>"
+    "<suggested fix, rewrite, or clarification to bring it in line with canon>"
   ]
 }
 
-Your evaluation should consider contradictions in character traits, timelines, or events based on MCU canon (films, series, animation).
+——————
 
-Only call a function if you need further clarification or data, and use the function call format if needed. If the contradictions are clear and do not need any more context, just respond with your analysis and recommendation.
+🏷 contradiction score scale (use this for consistency):
 
-Do not use unnecessary function calls. Only evaluate based on the data provided and provide clear, actionable insights.
+0–10 → ✅ canon compliant  
+- fully aligned with mcu canon. tiny or no issues.
+
+11–30 → ⚠️ minor deviation  
+- small continuity issues like vague motivations, slight timeline ambiguity, minor tech misuse.
+
+31–60 → ❌ moderate conflict  
+- character arcs, events, or tech usage misaligned with canon but fixable.
+
+61–90 → 🚫 major contradiction  
+- breaks key mcu rules (dead characters return, timeline/multiverse violations, reversed arcs).
+
+91–100 → 💥 canon collapse  
+- disregards major mcu foundations (infinity stones logic, tva rules, multiversal laws, etc.).
+
+——————
+
+📌 what to consider when scoring:
+
+- character arcs and traits (emotional logic, decisions)
+- timeline continuity (events, blip, snap, time travel)
+- status of characters (dead, alive, blipped, forgotten)
+- rules of magic, tech, multiverse, and artifacts
+- canon = mcu films, disney+ shows, *what if...?*
+- ignore: comics, non-canon shows, games, or novelizations
+
+——————
+
+📚 examples for reference:
+
+"peter parker enrolls at mit in 2025."  
+→ score: 25  
+→ why: he’s erased from memory post-*no way home*. plausible with difficulty.
+
+"tony stark returns as an ai guiding the young avengers."  
+→ score: 48  
+→ why: no ai setup, undercuts endgame closure, but not impossible with setup.
+
+"natasha romanoff survived vormir and returns in 2026."  
+→ score: 82  
+→ why: soul stone sacrifice = permanent. canon says she’s dead.
+
+"thanos reassembles the infinity gauntlet in 2027 and returns."  
+→ score: 99  
+→ why: infinity stones are destroyed, thanos is dead in all timelines. total canon break.
+
+——————
+
+⛔️ do not provide any explanation outside of the json format. only respond with the structured json.
+
+💡 ensure scoring is repeatable — the same story should always produce the same contradiction score.
 """
 
-# 🧠 Main function to call LLM
+# LLM caller
 def call_llm(prompt, model="meta-llama/llama-4-maverick:free"):
     try:
         response = client_ai.chat.completions.create(
@@ -94,42 +153,57 @@ def call_llm(prompt, model="meta-llama/llama-4-maverick:free"):
             temperature=0.7,
             max_tokens=500
         )
-        return response.choices[0].message.content.strip()
+
+        print("🧠 Raw LLM Response:", response)
+
+        if not response or not response.choices:
+            return "Error: No response or choices returned from LLM"
+
+        message = response.choices[0].message
+        return message.content.strip() if message else "Error: Empty LLM message"
+    
     except Exception as e:
+        print(f"❌ LLM Call Error: {e}")
         return f"Error calling LLM: {e}"
 
-# Initialize Flask app
+# Flask app
 app = Flask(__name__)
-
 CORS(app)
 
-# Register blueprints
+# Register routes
 app.register_blueprint(graphql_bp)
 app.register_blueprint(vector_search_bp, url_prefix='/vector_search')
+app.register_blueprint(commit_bp, url_prefix='/commit')
 
-# 📄 Route: Upload a story, compare with canon, get contradiction report
+# Main parse route
 @app.route('/parse', methods=['POST'])
 def parse_pdf_and_run_ai():
     if 'pdf' not in request.files:
         return jsonify({'error': 'No PDF uploaded'}), 400
 
-    # Extract text from the uploaded PDF
     pdf_file = request.files['pdf']
     extracted_text = extract_text_from_pdf(pdf_file)
+
+    print("📄 Extracted Text:\n", extracted_text)
 
     if extracted_text.startswith("Error"):
         return jsonify({'error': extracted_text}), 500
 
-    # Step 1: Embed the extracted user text (story) into a vector
+    # Embed story vector
     user_story_vector = embed_text(extracted_text)
 
-    # Step 2: Perform Vector Search on MongoDB for the most relevant canon data
+    # Fetch canon context from vector search
     canon_results = get_canon_context_from_vector_search(user_story_vector, limit=5)
-    
-    # Step 3: Prepare the context for the LLM
-    canon_context = "\n".join([f"Title: {result['title']}\nSummary: {result['summary']}" for result in canon_results])
-    
-    # Combine the user story and canon context
+
+    # Handle errors from MongoDB
+    if not isinstance(canon_results, list):
+        return jsonify({'error': canon_results}), 500
+
+    # Build prompt for LLM
+    canon_context = "\n".join(
+        [f"Title: {item['title']}\nSummary: {item['summary']}" for item in canon_results]
+    )
+
     prompt = f"""
     MCU Canon:
     {canon_context}
@@ -142,21 +216,54 @@ def parse_pdf_and_run_ai():
     Evaluate the user input against MCU canon.
     """
 
-    # Step 4: Call the LLM with the combined prompt
     llm_result = call_llm(prompt)
 
-    return jsonify({'llm_response': llm_result})
+    # Generate title
+    script_title = get_next_script_title()
 
-# ✅ Route to check MongoDB status
-@app.route('/db_status', methods=['GET'])
-def db_status():
     try:
-        client.admin.command('ping')
-        return jsonify({"status": "connected"}), 200
-    except Exception as e:
-        return jsonify({"status": "disconnected", "error": str(e)}), 500
+        llm_data = json.loads(llm_result)
 
-# 🔍 Route to get all MongoDB inputs
+        report_doc = {
+            "title": script_title,
+            "report": llm_data,
+            "script": extracted_text
+        }
+
+        reports_collection.insert_one(report_doc)
+
+    except Exception as e:
+        print(f"❌ Error saving to reports collection: {e}")
+        return jsonify({'error': f"Failed to save report: {str(e)}"}), 500
+
+    return jsonify({'llm_response': llm_result, 'title': script_title})
+
+@app.route('/get-report', methods=['POST'])
+def get_report_by_script_number():
+    # Get the JSON data from the request body
+    data = request.get_json()
+
+    # Ensure that the 'num' key is present in the JSON payload
+    if not data or 'num' not in data:
+        return jsonify({"error": "Missing 'num' in JSON payload"}), 400
+
+    num = data['num']
+    
+    # Append "Script_" in front of the number to create the title
+    title = f"Script_{num}"
+
+    # Query the MongoDB reports collection for the report by title
+    report = reports_collection.find_one({"title": title})
+
+    if report:
+        # Report found, return it as JSON
+        return jsonify(report), 200
+    else:
+        # Report not found, return an error message
+        return jsonify({"error": f"No report found for title: {title}"}), 404
+
+
+# Return all documents from MongoDB
 @app.route('/get_all_inputs', methods=['GET'])
 def get_all_inputs():
     try:
@@ -166,5 +273,6 @@ def get_all_inputs():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
+# Start the server
 if __name__ == '__main__':
     app.run(debug=True)

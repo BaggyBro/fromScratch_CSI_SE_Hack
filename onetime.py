@@ -3,6 +3,7 @@ import spacy
 from collections import defaultdict, OrderedDict
 import re
 from neo4j import GraphDatabase
+import json
 
 # Load NLP model
 nlp = spacy.load("en_core_web_lg")
@@ -85,6 +86,21 @@ for doc in collection.find():
                 "confidence": 0.85,
                 "version": "v1.0"
             })
+
+# ✅ Convert timeline to simplified JSON
+simple_timeline = []
+
+for year, events in OrderedDict(sorted(timeline.items(), key=lambda x: int(x[0]))).items():
+    for event in events:
+        simple_timeline.append({
+            "year": year,
+            "event": event["phrase"]
+        })
+
+with open("mcu_timeline.json", "w", encoding="utf-8") as f:
+    json.dump(simple_timeline, f, indent=2, ensure_ascii=False)
+
+print("📁 Saved simplified MCU timeline as 'mcu_timeline.json'")
 
 # Neo4j insert logic
 def insert_event(tx, year, event_data):

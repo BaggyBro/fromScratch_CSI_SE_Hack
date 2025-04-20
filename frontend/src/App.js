@@ -6,6 +6,7 @@ import { CreateStory } from './pages/CreateStory';
 import { MyStories } from './pages/MyStories';
 import { Settings } from './pages/Settings';
 import { Logout } from './pages/Logout';
+import KnowledgeGraph from './pages/KnowledgeGraph';
 
 function App() {
   const [stories, setStories] = useState([]); // Initialize stories state as an empty array
@@ -20,6 +21,7 @@ function App() {
             <Route path="/home" element={<Home />} />
             <Route path="/createstory" element={<CreateStory setStories={setStories} />} />
             <Route path="/mystories" element={<MyStories stories={stories} />} />
+            <Route path="/knowledgegraph" element={<KnowledgeGraph />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/logout" element={<Logout />} />
           </Routes>
